@@ -1,0 +1,14 @@
+CREATE DATABASE IF NOT EXISTS aqi_db;
+USE aqi_db;
+
+CREATE TABLE IF NOT EXISTS raw_aqi (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    city VARCHAR(100),
+    state VARCHAR(100),
+    date DATE,
+    aqi INT,
+    pm25 FLOAT,
+    pm10 FLOAT,
+    no2 FLOAT,
+    so2 FLOAT
+);
