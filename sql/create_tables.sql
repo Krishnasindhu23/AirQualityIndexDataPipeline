@@ -10,5 +10,6 @@ CREATE TABLE IF NOT EXISTS raw_aqi (
     pm25 FLOAT,
     pm10 FLOAT,
     no2 FLOAT,
-    so2 FLOAT
+    so2 FLOAT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
