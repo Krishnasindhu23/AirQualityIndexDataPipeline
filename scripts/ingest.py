@@ -2,6 +2,7 @@ import pandas as pd
 import mysql.connector
 import glob
 import os
+from datetime import datetime
 
 # MySQL connection
 conn = mysql.connector.connect(
@@ -32,6 +33,8 @@ df = pd.read_csv(file_to_load)
 
 # Insert rows into raw_aqi
 for _, row in df.iterrows():
+
+    formatted_date = datetime.strptime(row['date'], "%d-%m-%Y").strftime("%Y-%m-%d")
     cursor.execute(
         """
         INSERT INTO raw_aqi (city, state, date, aqi, pm25, pm10, no2, so2)
@@ -40,7 +43,7 @@ for _, row in df.iterrows():
         (
             row['area'],               # city
             row['state'],              # state
-            row['date'],               # date
+            formatted_date,              # date
             row['aqi_value'],          # aqi
             None,                      # pm25
             None,                      # pm10
