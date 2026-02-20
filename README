@@ -1,0 +1,185 @@
+# **Air Quality Index Data Pipeline – Step by Step Workflow**
+
+## **1. Project Setup**
+
+1. Clone the GitHub repository:
+
+```bash
+git clone https://github.com/Krishnasindhu23/AirQualityIndexDataPipeline.git
+cd AirQualityIndexDataPipeline
+```
+
+2. Project structure:
+
+```
+AirQualityIndexDataPipeline/
+│
+├── data/
+│   └── india_aqi.csv
+│
+├── data/raw_chunks/           # Will contain split CSV files
+├── scripts/
+│   ├── ingest.py
+│   ├── split_data.py
+│
+├── sql/
+│   ├── create_tables.sql
+│   ├── transform_aqi.sql
+│
+├── docker/
+│   └── docker-compose.yml
+│
+├── Dockerfile
+├── README.md
+```
+
+---
+
+## **2. Split Raw Data into Chunks**
+
+* Purpose: Simulate incremental data ingestion instead of loading all data at once.
+* Run the Python script:
+
+```bash
+python scripts/split_data.py
+```
+
+* **Output:** Multiple CSV chunks will be created in `data/raw_chunks/` (e.g., `aqi_chunk_0.csv`, `aqi_chunk_1.csv`, …).
+
+---
+
+## **3. Create MySQL Database and Tables**
+
+1. Ensure MySQL is installed (or run via Docker).
+2. Run the `create_tables.sql` script to create the database and `raw_aqi` table:
+
+```bash
+mysql -u root -p < sql/create_tables.sql
+```
+
+* **`raw_aqi` table columns:**
+
+  * `id` (auto-increment primary key)
+  * `city`, `state`, `date`, `aqi`
+  * `pm25`, `pm10`, `no2`, `so2` (nullable)
+  * `created_at` (timestamp)
+
+3. Optional: Add a **unique key constraint** to prevent duplicates:
+
+```sql
+ALTER TABLE raw_aqi
+ADD UNIQUE KEY unique_city_state_date_aqi (city, state, date, aqi);
+```
+
+---
+
+## **4. Ingest Data into MySQL**
+
+* Script: `scripts/ingest.py`
+* Steps performed by the script:
+
+  1. Scans `data/raw_chunks/` for CSV files.
+  2. Reads the first unprocessed chunk using `pandas`.
+  3. Maps CSV columns to database columns (`area → city`, `aqi_value → aqi`).
+  4. Converts `date` from `DD-MM-YYYY` to `YYYY-MM-DD` format.
+  5. Inserts rows into `raw_aqi`.
+  6. Marks the file as processed (`.processed` extension).
+
+```bash
+python scripts/ingest.py
+```
+
+* Repeat until all chunks are ingested.
+
+* **Check row count in MySQL:**
+
+```sql
+SELECT COUNT(*) FROM raw_aqi;
+```
+
+---
+
+## **5. Transform Data for Analytics**
+
+* Script: `sql/transform_aqi.sql`
+* Creates `aqi_daily_summary` table and computes daily average AQI per city.
+* Categorizes AQI:
+
+| Avg AQI | Category |
+| ------- | -------- |
+| <=50    | Good     |
+| <=100   | Moderate |
+| <=200   | Poor     |
+| >200    | Severe   |
+
+* Run the transformation in MySQL:
+
+```bash
+mysql -u root -p < sql/transform_aqi.sql
+```
+
+* Verify:
+
+```sql
+SELECT COUNT(*) FROM aqi_daily_summary;
+SELECT * FROM aqi_daily_summary LIMIT 5;
+```
+
+---
+
+## **6. Optional Alerts & Dashboard**
+
+* `scripts/alert.py` → Sends alerts for hazardous AQI (>300).
+* `scripts/dashboard.py` → Visualizes top 10 cities by average AQI.
+
+---
+
+## **7. Docker Setup (Optional)**
+
+* Dockerfile (in project root) contains Python environment and pipeline setup.
+* `docker/docker-compose.yml` defines services:
+
+  * `mysql` → MySQL database
+  * `etl` → Python ETL container
+
+### **Steps:**
+
+1. Make sure Docker Desktop is running.
+2. Ensure Dockerfile is in **project root**, `docker-compose.yml` in `docker/`.
+3. Update build context in `docker-compose.yml`:
+
+```yaml
+etl:
+  build: ..   # points to project root
+```
+
+4. Run the pipeline:
+
+```bash
+cd AirQualityIndexDataPipeline
+docker-compose -f docker/docker-compose.yml up --build
+```
+
+* Docker will start MySQL, build the ETL image, and execute your pipeline.
+
+---
+
+## **8. Monitoring and Validation**
+
+* Check MySQL row counts:
+
+```sql
+SELECT COUNT(*) FROM raw_aqi;
+SELECT COUNT(*) FROM aqi_daily_summary;
+```
+
+* Check `.processed` files to confirm ingestion.
+* Optional: Use `alert.py` and `dashboard.py` for notifications and visualization.
+
+---
+
+**Summary:**
+
+* Raw CSV split → ingested incrementally → transformed → analytics table created → alerts & dashboard optional.
+* Docker optionally automates MySQL + ETL execution.
+* Unique constraints help prevent duplicates.
