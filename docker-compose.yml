@@ -1,0 +1,32 @@
+version: "3.8"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: aqi_mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: aqi_db
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+  etl:
+    build: .
+    container_name: aqi_etl
+    depends_on:
+      - mysql
+    command: python scripts/run_pipeline.py
+    volumes:
+      - .:/app
+    working_dir: /app
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_USER: root
+      MYSQL_PASSWORD: password
+      MYSQL_DB: aqi_db
+      MYSQL_PORT: 3306
+
+volumes:
+  mysql_data:
